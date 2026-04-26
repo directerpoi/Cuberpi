@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cuberpi</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+    canvas { display: block; width: 100% !important; height: 100% !important; }
+  </style>
+</head>
+<body>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const CUBE_SIZE   = 1.0;
+const GAP         = 0.12;
+const STEP        = CUBE_SIZE + GAP;
+const GRID_W      = 26;
+const GRID_D      = 34;
+const CUBE_H      = 0.18;
+const TRAVEL_SPD  = 2.8;
+const FOG_NEAR    = 8;
+const FOG_FAR     = 28;
+const FLOOR_Y     = 0;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = false;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+scene.fog = new THREE.Fog(0x000000, FOG_NEAR, FOG_FAR);
+
+const aspect = window.innerWidth / window.innerHeight;
+const ISO_SIZE = 14;
+const camera = new THREE.OrthographicCamera(
+  -ISO_SIZE * aspect, ISO_SIZE * aspect,
+   ISO_SIZE, -ISO_SIZE,
+   0.1, 200
+);
+
+const ISO_YAW   =  Math.PI / 4;
+const ISO_PITCH = -Math.atan(1 / Math.sqrt(2));
+const camDist = 40;
+camera.position.set(
+  Math.sin(ISO_YAW) * Math.cos(ISO_PITCH) * camDist,
+  -Math.sin(ISO_PITCH) * camDist,
+  Math.cos(ISO_YAW) * Math.cos(ISO_PITCH) * camDist
+);
+camera.lookAt(0, FLOOR_Y, 0);
+camera.updateProjectionMatrix();
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.18);
+scene.add(ambient);
+
+const rimLight = new THREE.DirectionalLight(0x88ccff, 1.1);
+rimLight.position.set(-12, 20, 8);
+scene.add(rimLight);
+
+const fill = new THREE.DirectionalLight(0x2255aa, 0.45);
+fill.position.set(14, 10, -10);
+scene.add(fill);
+
+const cubeMat = new THREE.MeshStandardMaterial({
+  color: 0x090d14,
+  emissive: 0x0a1828,
+  emissiveIntensity: 0.35,
+  roughness: 0.55,
+  metalness: 0.82,
+});
+
+const edgeMat = new THREE.LineBasicMaterial({
+  color: 0x1a4fff,
+  transparent: true,
+  opacity: 0.55,
+});
+
+const boxGeo  = new THREE.BoxGeometry(CUBE_SIZE, CUBE_H, CUBE_SIZE);
+const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+
+const TOTAL = GRID_W * GRID_D;
+const tiles  = [];
+const halfW  = Math.floor(GRID_W / 2);
+const halfD  = Math.floor(GRID_D / 2);
+
+for (let i = 0; i < TOTAL; i++) {
+  const mesh = new THREE.Mesh(boxGeo, cubeMat);
+  const edge = new THREE.LineSegments(edgeGeo, edgeMat);
+  mesh.add(edge);
+  scene.add(mesh);
+  tiles.push(mesh);
+}
+
+let scrollZ = 0;
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  const a = w / h;
+  camera.left   = -ISO_SIZE * a;
+  camera.right  =  ISO_SIZE * a;
+  camera.top    =  ISO_SIZE;
+  camera.bottom = -ISO_SIZE;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+});
+
+let last = performance.now();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now   = performance.now();
+  const delta = Math.min((now - last) * 0.001, 0.05);
+  last = now;
+
+  scrollZ += TRAVEL_SPD * delta;
+
+  const scroll = scrollZ % STEP;
+  for (let r = 0; r < GRID_D; r++) {
+    for (let c = 0; c < GRID_W; c++) {
+      const tile = tiles[r * GRID_W + c];
+      tile.position.x = (c - halfW) * STEP;
+      tile.position.y = FLOOR_Y;
+      tile.position.z = (r - halfD) * STEP - scroll;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+animate();
+</script>
+</body>
+</html>
